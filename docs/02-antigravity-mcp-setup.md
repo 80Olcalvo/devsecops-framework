@@ -46,7 +46,7 @@ Edita o crea el archivo `~/.gemini/config/mcp_config.json` en tu máquina local 
   "mcpServers": {
     "snyk": {
       "command": "npx",
-      "args": ["-y", "@snyk/snyk-mcp-server"],
+      "args": ["-y", "snyk@latest", "mcp", "-t", "stdio"],
       "env": {
         "SNYK_TOKEN": "TU_SNYK_API_TOKEN"
       }
