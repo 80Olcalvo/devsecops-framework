@@ -1,0 +1,4 @@
+project_id   = "empresa-devsecops-qa"
+region       = "us-central1"
+environment  = "qa"
+service_name = "secure-api"

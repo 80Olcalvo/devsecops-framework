@@ -1,0 +1,107 @@
+name: 🚀 CI/CD Pipeline - Despliegue a GCP Producción
+
+on:
+  push:
+    branches:
+      - main
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  security-and-compliance:
+    name: 🛡️ Auditoría Exhaustiva de Seguridad y Cumplimiento
+    runs-on: ubuntu-latest
+    steps:
+      - name: 📥 Checkout de Código
+        uses: actions/checkout@v4
+
+      - name: 🐍 Configurar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: 📦 Instalar Dependencias
+        run: |
+          pip install -r app/requirements.txt
+
+      - name: 🧪 Ejecutar Tests con Cobertura
+        run: |
+          pytest app/tests/ --cov=app --cov-report=term-missing
+
+      - name: ⚙️ Configurar Snyk CLI
+        uses: snyk/actions/setup@master
+
+      - name: 🔍 Snyk Scan (SCA & SAST con umbral estricto)
+        run: |
+          snyk test --file=app/requirements.txt --severity-threshold=medium
+          snyk code test app/ --severity-threshold=medium
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+
+      - name: 🛡️ Semgrep Scan (Full Security Rulesets)
+        uses: semgrep/semgrep-action@v1
+        with:
+          config: >-
+            p/security-audit
+            p/owasp-top-ten
+            p/secrets
+            p/python
+            p/fastapi
+        env:
+          SEMGREP_APP_TOKEN: ${{ secrets.SEMGREP_APP_TOKEN }}
+
+  deploy-prod:
+    name: 🏭 Build & Deploy a GCP Producción
+    needs: [security-and-compliance]
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: ${{ steps.deploy.outputs.url }}
+    env:
+      IMAGE_NAME: "${{ secrets.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID_PROD }}/${{ secrets.GCP_ARTIFACT_REPO }}/app:${{ github.sha }}"
+
+    steps:
+      - name: 📥 Checkout de Código
+        uses: actions/checkout@v4
+
+      - name: 🔑 Autenticación con Google Cloud (WIF)
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.GCP_WIF_PROVIDER_PROD }}
+          service_account: ${{ secrets.GCP_SA_EMAIL_PROD }}
+
+      - name: ⚙️ Configurar gcloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+
+      - name: 🐳 Configurar Docker para Artifact Registry
+        run: |
+          gcloud auth configure-docker ${{ secrets.GCP_REGION }}-docker.pkg.dev --quiet
+
+      - name: 🔨 Construir Imagen Docker
+        run: |
+          docker build -t ${{ env.IMAGE_NAME }} -t ${{ secrets.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID_PROD }}/${{ secrets.GCP_ARTIFACT_REPO }}/app:latest ./app
+
+      - name: 🔍 Snyk Container Scan
+        uses: snyk/actions/docker@master
+        with:
+          image: ${{ env.IMAGE_NAME }}
+          args: --severity-threshold=high
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+
+      - name: 📤 Push de Imagen a GCP Artifact Registry
+        run: |
+          docker push ${{ env.IMAGE_NAME }}
+          docker push ${{ secrets.GCP_REGION }}-docker.pkg.dev/${{ secrets.GCP_PROJECT_ID_PROD }}/${{ secrets.GCP_ARTIFACT_REPO }}/app:latest
+
+      - name: 🚀 Desplegar en Google Cloud Run (Producción)
+        id: deploy
+        uses: google-github-actions/deploy-cloudrun@v2
+        with:
+          service: ${{ secrets.GCP_SERVICE_NAME }}-prod
+          image: ${{ env.IMAGE_NAME }}
+          region: ${{ secrets.GCP_REGION }}
+          flags: "--allow-unauthenticated --port=8000"

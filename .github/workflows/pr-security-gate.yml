@@ -1,0 +1,68 @@
+name: 🛡️ Security Gate (Snyk & Semgrep)
+
+on:
+  pull_request:
+    branches: [ "main", "qa" ]
+  push:
+    branches: [ "feature/**", "fix/**", "refactor/**" ]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  snyk-security-scan:
+    name: 🔒 1er Filtro - Snyk Scan (SAST & SCA)
+    runs-on: ubuntu-latest
+    steps:
+      - name: 📥 Checkout de Código
+        uses: actions/checkout@v4
+
+      - name: 🐍 Configurar Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: "pip"
+
+      - name: 📦 Instalar Dependencias
+        run: |
+          python -m pip install --upgrade pip
+          if [ -f app/requirements.txt ]; then pip install -r app/requirements.txt; fi
+
+      - name: 🧪 Ejecutar Tests Unitarios
+        run: |
+          pytest app/tests/ -v
+
+      - name: ⚙️ Configurar Snyk CLI
+        uses: snyk/actions/setup@master
+
+      - name: 🔍 Snyk Open Source (SCA)
+        run: |
+          snyk test --file=app/requirements.txt --severity-threshold=medium
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+
+      - name: 🔍 Snyk Code (SAST)
+        run: |
+          snyk code test app/ --severity-threshold=medium
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+
+  semgrep-security-scan:
+    name: 🛡️ 2do Filtro - Semgrep SAST & Secrets Scan
+    runs-on: ubuntu-latest
+    steps:
+      - name: 📥 Checkout de Código
+        uses: actions/checkout@v4
+
+      - name: 🔍 Semgrep Scan (p/security-audit & p/owasp-top-ten & p/secrets)
+        uses: semgrep/semgrep-action@v1
+        with:
+          config: >-
+            p/security-audit
+            p/owasp-top-ten
+            p/secrets
+            p/python
+            p/fastapi
+        env:
+          SEMGREP_APP_TOKEN: ${{ secrets.SEMGREP_APP_TOKEN }}
