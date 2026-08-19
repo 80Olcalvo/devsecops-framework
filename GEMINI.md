@@ -46,10 +46,12 @@ Todo cambio, adición de características, refactorización o corrección de bug
 
 ---
 
-## 🧩 Herramientas y Stack de Desarrollo
+## 🧩 Ecosistema MCP en Antigravity
 
 - **Generador de Código & Asistente:** Google Antigravity (IDE / 2.0).
 - **1er Filtro de Seguridad:** Snyk.io (MCP & GitHub Actions).
 - **2do Filtro de Seguridad:** Semgrep.dev (MCP & GitHub Actions).
-- **Repositorio & CI/CD:** GitHub + GitHub Actions + GitHub Environments.
+- **Control de Versiones & PRs:** GitHub MCP Server (`@modelcontextprotocol/server-github`).
+- **Nube e Infraestructura:** Google Cloud MCP Server (`@google-cloud/mcp-server`).
+- **CI/CD:** GitHub Actions + GitHub Environments.
 - **Cloud Provider:** Google Cloud Platform (Proyectos independientes QA y Producción).

@@ -1,6 +1,6 @@
 # 🛡️ Plantilla Corporativa de Desarrollo Seguro Agéntico (DevSecOps Framework)
 
-Plantilla de repositorio empresarial diseñada para estandarizar el ciclo de desarrollo seguro asistido por Inteligencia Artificial agéntica. Integra **Google Antigravity** como generador y asistente de código, **Snyk.io** como primer filtro de seguridad, **Semgrep.dev** como segundo filtro de seguridad (ambos integrados vía MCP y CI/CD), **GitHub Actions** para integración continua con gestión de secretos, y **Google Cloud Platform (GCP)** con proyectos independientes para **QA** y **Producción**.
+Plantilla de repositorio empresarial diseñada para estandarizar el ciclo de desarrollo seguro asistido por Inteligencia Artificial agéntica. Integra **Google Antigravity** como generador y asistente de código, **Snyk.io** como primer filtro de seguridad, **Semgrep.dev** como segundo filtro de seguridad, **GitHub MCP** para interacción directa con el repositorio, **Google Cloud MCP** para observabilidad e infraestructura, **GitHub Actions** para integración continua con gestión de secretos, y **Google Cloud Platform (GCP)** con proyectos independientes para **QA** y **Producción**.
 
 ---
 
@@ -13,11 +13,11 @@ flowchart TD
         AgentGen --> SnykScan["🔒 1er Filtro: Snyk MCP (SAST & SCA)"]
         SnykScan --> SemgrepScan["🛡️ 2do Filtro: Semgrep MCP (Rules & Secrets)"]
         SemgrepScan --> DocsGen["📝 Documentación Obligatoria & Docstrings"]
+        DocsGen --> GitHubMCP["🐙 GitHub MCP (Commits, Branches & PRs)"]
     end
 
     subgraph GitHub [" 🐙 GitHub Repository & Actions "]
-        DocsGen --> GitCommit["📌 Commit Semántico + Push"]
-        GitCommit --> PRGate["🛡️ PR Security Gate (Snyk + Semgrep)"]
+        GitHubMCP --> PRGate["🛡️ PR Security Gate (Snyk + Semgrep)"]
         PRGate --> BranchQA["🌿 Rama 'qa'"]
         PRGate --> BranchMain["🌿 Rama 'main'"]
     end
@@ -25,16 +25,21 @@ flowchart TD
     subgraph GCP [" ☁️ Google Cloud Platform "]
         BranchQA -->|GitHub Actions CD| GCPQA["🧪 Proyecto GCP QA\n(Cloud Run + Artifact Registry)"]
         BranchMain -->|GitHub Actions CD + Aprobación| GCPProd["🏭 Proyecto GCP Producción\n(Cloud Run + Artifact Registry)"]
+        GCPQA -.->|Auditoría e Inspección| GCPMCP["☁️ Google Cloud MCP"]
+        GCPProd -.->|Auditoría e Inspección| GCPMCP
+        GCPMCP -.-> Antigravity
     end
 ```
 
 ---
 
-## ⚡ Stack Tecnológico
+## ⚡ Stack Tecnológico y Servidores MCP
 
 - **Generador de Código Agéntico:** [Google Antigravity](https://deepmind.google/technologies/antigravity/) (IDE / Antigravity 2.0 / CLI).
 - **1er Filtro de Seguridad:** [Snyk.io](https://snyk.io/) (Escaneo SAST de código fuente y SCA de dependencias vía MCP y GitHub Actions).
 - **2do Filtro de Seguridad:** [Semgrep.dev](https://semgrep.dev/) (Escaneo SAST estático avanzado y prevención de fuga de secretos vía MCP y GitHub Actions).
+- **Integración de Repositorio:** [GitHub MCP Server](https://github.com/modelcontextprotocol/servers/tree/main/src/github) (Gestión de PRs, issues y ramas por el agente).
+- **Integración de Nube:** [Google Cloud MCP Server](https://github.com/google-cloud) (Monitoreo de Cloud Run, Artifact Registry y Logs).
 - **Control de Versiones & CI/CD:** GitHub + GitHub Actions + GitHub Environments.
 - **Plataforma Cloud:** Google Cloud Platform (GCP) con **Cloud Run** y **Artifact Registry**.
 - **Autenticación Cloud:** GCP Workload Identity Federation (sin claves estáticas de servicio).
@@ -57,8 +62,8 @@ agy
 
 Al abrir la carpeta, Antigravity detecta y activa automáticamente las reglas maestras definidas en [`GEMINI.md`](GEMINI.md) y [`.agent/rules/`](.agent/rules/).
 
-### 2. Configurar los Servidores MCP de Seguridad
-Asegúrate de que tu configuración de MCP en `~/.gemini/config/mcp_config.json` tenga habilitados los servidores de Snyk y Semgrep (ver [`.gemini/mcp_config.json.template`](.gemini/mcp_config.json.template)):
+### 2. Configurar los 4 Servidores MCP (Snyk, Semgrep, GitHub y Google Cloud)
+Asegúrate de que tu configuración de MCP en `~/.gemini/config/mcp_config.json` tenga habilitados los servidores (ver [`.gemini/mcp_config.json.template`](.gemini/mcp_config.json.template)):
 
 ```json
 {
@@ -76,6 +81,21 @@ Asegúrate de que tu configuración de MCP en `~/.gemini/config/mcp_config.json`
       "env": {
         "SEMGREP_APP_TOKEN": "TU_SEMGREP_TOKEN"
       }
+    },
+    "github": {
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-github"],
+      "env": {
+        "GITHUB_PERSONAL_ACCESS_TOKEN": "TU_GITHUB_PAT"
+      }
+    },
+    "google-cloud": {
+      "command": "npx",
+      "args": ["-y", "@google-cloud/mcp-server"],
+      "env": {
+        "GCP_PROJECT_ID": "TU_PROYECTO_GCP_ID",
+        "GOOGLE_APPLICATION_CREDENTIALS": "/ruta/a/credencial.json"
+      }
     }
   }
 }
@@ -83,7 +103,7 @@ Asegúrate de que tu configuración de MCP en `~/.gemini/config/mcp_config.json`
 
 ### 3. Bootstrapping Asistido por Antigravity
 Puedes escribirle directamente a Antigravity en el chat:
-> *"Hola Antigravity, inicializa el entorno virtual de Python, instala las dependencias de `app/requirements.txt`, ejecuta los tests con pytest y verifica las herramientas MCP de Snyk y Semgrep."*
+> *"Hola Antigravity, inicializa el entorno virtual de Python, instala las dependencias de `app/requirements.txt`, ejecuta los tests con pytest y verifica las herramientas MCP disponibles."*
 
 ---
 
@@ -119,7 +139,7 @@ DEvSecOps Framework/
 │       ├── 01-security-gates.md       # Regla: Doble filtro Snyk + Semgrep
 │       └── 02-documentation-rules.md  # Regla: Documentación obligatoria con cada commit
 ├── .gemini/
-│   └── mcp_config.json.template       # Plantilla de configuración MCP (Snyk + Semgrep)
+│   └── mcp_config.json.template       # Plantilla de configuración MCP (Snyk, Semgrep, GitHub, GCP)
 ├── .github/
 │   ├── workflows/
 │   │   ├── pr-security-gate.yml       # Validación SAST/SCA en PRs (Snyk + Semgrep)
@@ -134,7 +154,7 @@ DEvSecOps Framework/
 │       └── test_main.py               # Pruebas unitarias
 ├── docs/                              # Documentación técnica y guías de onboarding
 │   ├── 01-onboarding-developer.md     # Guía paso a paso para nuevos desarrolladores
-│   ├── 02-antigravity-mcp-setup.md    # Configuración de Antigravity y MCPs
+│   ├── 02-antigravity-mcp-setup.md    # Configuración de Antigravity y suite de 4 MCPs
 │   ├── 03-branching-and-git-flow.md   # Estrategia de ramas y políticas de commit
 │   ├── 04-github-secrets-config.md    # Configuración de secretos en GitHub Actions
 │   └── 05-gcp-environments-setup.md  # Setup de GCP QA y Producción con WIF
@@ -154,7 +174,7 @@ DEvSecOps Framework/
 ## 📚 Documentación Adicional
 
 - [📖 Guía de Onboarding para Nuevos Desarrolladores](docs/01-onboarding-developer.md)
-- [🤖 Configuración de Antigravity & MCP](docs/02-antigravity-mcp-setup.md)
+- [🤖 Configuración de Antigravity & Suite MCP](docs/02-antigravity-mcp-setup.md)
 - [🌿 Estrategia de Ramas y Commits](docs/03-branching-and-git-flow.md)
 - [🔐 Guía de Secretos en GitHub Actions](docs/04-github-secrets-config.md)
 - [☁️ Configuración de Proyectos en GCP y Workload Identity](docs/05-gcp-environments-setup.md)
